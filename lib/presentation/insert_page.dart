@@ -1,12 +1,12 @@
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:money_app/data/model/category.dart';
 import 'package:money_app/data/repository/category_repository.dart';
 import 'package:money_app/data/repository/transaction_repository.dart';
 import 'package:money_app/data/service/httpservice.dart';
 import 'package:money_app/data/usecase/request/add_transaction_request.dart';
+import 'package:money_app/data/usecase/response/get_category_response.dart';
 
 class InsertPage extends StatefulWidget {
   const InsertPage({super.key});
@@ -17,104 +17,53 @@ class InsertPage extends StatefulWidget {
 
 class _InsertPageState extends State<InsertPage> {
   final _formKey = GlobalKey<FormState>();
-  final _categoryRepo = CategoryRepository(HttpService());
-  final _transactionRepo = TransactionRepository(HttpService());
-
-  List<Category> _categories = [];
-  Category? _selectedCategory;
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController();
-
+  final _descCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+  final categoryRepo = CategoryRepository(HttpService());
+  final transactionRepo = TransactionRepository(HttpService());
+  GetCategoryResponse? categoryResponse;
+  int? selectedCategoryId;
   File? _selectedImage;
-  bool _isLoading = false;
+  final _picker = ImagePicker();
+  bool _isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
-    _dateController.text = DateFormat('yyyy-MM-dd').format(_selectedDate);
     _loadCategories();
   }
 
   Future<void> _loadCategories() async {
-    final response = await _categoryRepo.getAllCategory();
-    if (mounted) {
-      setState(() {
-        _categories = response.data;
-      });
-    }
-  }
+    setState(() {
+      _isLoadingCategories = true;
+    });
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
-  }
-
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-      });
-    }
-  }
-
-  Future<void> _submitTransaction() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedCategory == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a category')),
-        );
-        return;
-      }
-
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final request = AddTransactionRequest(
-          categoryId: _selectedCategory!.id,
-          amount: int.parse(_amountController.text),
-          transactionDate: _selectedDate,
-          note: _noteController.text,
-          image: _selectedImage,
-        );
-
-        final response = await _transactionRepo.createTransaction(request);
-
-        if (!mounted) return;
-
+    try {
+      final response = await categoryRepo.getAllCategory();
+      log('Categories Response: ${response.toJson()}');
+      if (response.status == 'success') {
         setState(() {
-          _isLoading = false;
+          categoryResponse = response;
+          _isLoadingCategories = false;
         });
-
-        if (response.status == 'success') {
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingCategories = false;
+          });
+          log('Failed to load categories: ${response.message}');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Transaction added successfully')),
-          );
-          Navigator.pop(context, true);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${response.message}')),
+            SnackBar(
+              content: Text('Gagal memuat kategori: ${response.message}'),
+            ),
           );
         }
-      } catch (e) {
-        if (!mounted) return;
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingCategories = false;
         });
         ScaffoldMessenger.of(
           context,
@@ -124,143 +73,174 @@ class _InsertPageState extends State<InsertPage> {
   }
 
   @override
+  void dispose() {
+    _descCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      } else {
+        log('No image selected.');
+      }
+    } catch (e) {
+      log('Error picking image: $e');
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _save() async {
+    if (_formKey.currentState!.validate()) {
+      final amount = double.tryParse(_amountCtrl.text) ?? 0.0;
+      final formattedDate = _selectedDate.toIso8601String().split('T').first;
+
+      try {
+        final response = await transactionRepo.createTransaction(
+          request: AddTransactionRequest(
+            categoryId: selectedCategoryId!,
+            amount: amount,
+            transactionDate: formattedDate,
+            note: _descCtrl.text.trim(),
+            image: _selectedImage,
+          ),
+        );
+
+        if (mounted) {
+          if (response.status == 'success') {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(response.message)));
+            Navigator.of(context).pop(true);
+          } else {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(response.message)));
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Transaction'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const Text('Tambah Transaksi')),
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ListView(
             children: [
-              DropdownButtonFormField<Category>(
-                initialValue: _selectedCategory,
-                hint: const Text('Select Category'),
-                items: _categories.map((category) {
-                  return DropdownMenuItem<Category>(
-                    value: category,
-                    child: Text('${category.name} (${category.type})'),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
-                validator: (value) {
-                  if (value == null) {
-                    return 'Please select a category';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.attach_money),
+              if (_isLoadingCategories)
+                const Center(child: CircularProgressIndicator())
+              else
+                DropdownButtonFormField<int>(
+                  initialValue: selectedCategoryId,
+                  hint: const Text('Pilih Kategori'),
+                  items:
+                      categoryResponse?.data
+                          .map(
+                            (cat) => DropdownMenuItem<int>(
+                              value: cat.id,
+                              child: Text(cat.name),
+                            ),
+                          )
+                          .toList() ??
+                      [],
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      selectedCategoryId = newValue;
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Kategori'),
+                  validator: (int? v) => v == null ? 'Pilih kategori' : null,
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter amount';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
+              const SizedBox(height: 12),
               TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'Date',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: _selectDate,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select a date';
-                  }
-                  return null;
-                },
+                controller: _descCtrl,
+                decoration: const InputDecoration(labelText: 'Deskripsi'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Masukkan deskripsi'
+                    : null,
               ),
-              const SizedBox(height: 16),
-
+              const SizedBox(height: 12),
               TextFormField(
-                controller: _noteController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Note',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.note),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a note';
-                  }
+                controller: _amountCtrl,
+                decoration: const InputDecoration(labelText: 'Nominal'),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Masukkan nominal';
+                  final n = double.tryParse(v);
+                  if (n == null) return 'Masukkan angka yang valid';
+                  if (n <= 0) return 'Nominal harus lebih besar dari 0';
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  width: double.infinity,
-                  height: 150,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Tanggal: ${_selectedDate.toLocal().toString().split('T').first}',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _pickDate,
+                    child: const Text('Pilih Tanggal'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.image),
+                label: Text(
+                  _selectedImage == null
+                      ? 'Pilih Gambar (Opsional)'
+                      : 'Gambar Terpilih',
+                ),
+              ),
+              if (_selectedImage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  height: 200,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[100],
                   ),
-                  child: _selectedImage != null
-                      ? Image.file(_selectedImage!, fit: BoxFit.cover)
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.camera_alt,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text('Tap to select image'),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitTransaction,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _selectedImage!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Add Transaction',
-                          style: TextStyle(fontSize: 16),
-                        ),
                 ),
-              ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton(onPressed: _save, child: const Text('Simpan')),
             ],
           ),
         ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:money_app/presentation/homepage.dart';
+import 'package:money_app/presentation/home_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,8 +15,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const Homepage(),
+      home: const HomePage(),
     );
   }
 }
-
