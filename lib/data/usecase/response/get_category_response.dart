@@ -1,6 +1,4 @@
-import 'package:meta/meta.dart';
 import 'dart:convert';
-
 import 'package:money_app/data/model/category.dart';
 
 class GetCategoryResponse {
