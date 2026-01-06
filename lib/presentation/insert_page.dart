@@ -6,7 +6,7 @@ import 'package:money_app/data/repository/category_repository.dart';
 import 'package:money_app/data/repository/transaction_repository.dart';
 import 'package:money_app/data/service/httpservice.dart';
 import 'package:money_app/data/usecase/request/add_transaction_request.dart';
-import 'package:money_app/data/usecase/response/get_category_response.dart';
+import 'package:money_app/data/usecase/response/get_all_category_response.dart';
 
 class InsertPage extends StatefulWidget {
   const InsertPage({super.key});

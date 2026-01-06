@@ -1,7 +1,7 @@
 import 'package:money_app/data/service/httpservice.dart';
 import 'package:money_app/data/usecase/request/add_transaction_request.dart';
 import 'package:money_app/data/usecase/response/get_all_transaction_response.dart';
-import 'package:money_app/data/usecase/response/get_transaction_response.dart';
+import 'package:money_app/data/usecase/response/get_income_response.dart';
 
 class TransactionRepository {
   final HttpService apiService;

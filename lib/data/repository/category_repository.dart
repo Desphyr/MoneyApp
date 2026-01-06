@@ -1,5 +1,5 @@
 import 'package:money_app/data/service/httpservice.dart';
-import 'package:money_app/data/usecase/response/get_category_response.dart';
+import 'package:money_app/data/usecase/response/get_all_category_response.dart';
 
 class CategoryRepository {
   final HttpService httpService;
