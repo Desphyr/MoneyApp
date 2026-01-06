@@ -1,23 +1,23 @@
 import 'dart:convert';
 import 'package:money_app/data/model/transaction.dart';
 
-class GetTransactionsResponse {
+class GetIncomeResponse {
   final String status;
   final String message;
   final Transaction data;
 
-  GetTransactionsResponse({
+  GetIncomeResponse({
     required this.status,
     required this.message,
     required this.data,
   });
 
-  GetTransactionsResponse copyWith({
+  GetIncomeResponse copyWith({
     String? status,
     String? message,
     Transaction? data,
   }) {
-    return GetTransactionsResponse(
+    return GetIncomeResponse(
       status: status ?? this.status,
       message: message ?? this.message,
       data: data ?? this.data,
@@ -32,8 +32,8 @@ class GetTransactionsResponse {
     };
   }
 
-  factory GetTransactionsResponse.fromMap(Map<String, dynamic> map) {
-    return GetTransactionsResponse(
+  factory GetIncomeResponse.fromMap(Map<String, dynamic> map) {
+    return GetIncomeResponse(
       status: map['status'] as String,
       message: map['message'] as String,
       data: Transaction.fromMap(map['data'] as Map<String, dynamic>),
@@ -42,8 +42,8 @@ class GetTransactionsResponse {
 
   String toJson() => json.encode(toMap());
 
-  factory GetTransactionsResponse.fromJson(String source) =>
-      GetTransactionsResponse.fromMap(
+  factory GetIncomeResponse.fromJson(String source) =>
+      GetIncomeResponse.fromMap(
         json.decode(source) as Map<String, dynamic>,
       );
 }

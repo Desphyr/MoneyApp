@@ -23,7 +23,7 @@ class TransactionRepository {
     }
   }
 
-  Future<GetTransactionsResponse> createTransaction({
+  Future<GetIncomeResponse> createTransaction({
     AddTransactionRequest? request,
   }) async {
     try {
@@ -35,10 +35,10 @@ class TransactionRepository {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final responseData = GetTransactionsResponse.fromJson(response.body);
+        final responseData = GetIncomeResponse.fromJson(response.body);
         return responseData;
       } else {
-        final errorResponse = GetTransactionsResponse.fromJson(response.body);
+        final errorResponse = GetIncomeResponse.fromJson(response.body);
         return errorResponse;
       }
     } catch (e) {
